@@ -58,9 +58,24 @@ aug = ImageDataGenerator(
     brightness_range=[0.5, 1.5],
 )
 
+def flipped_flow(X, y, batch_size, flip_prob=0.5):
+    """Yield augmented batches; optionally flip image and negate steering."""
+    gen = aug.flow(X, y, batch_size=batch_size, shuffle=True)
+    while True:
+        Xb, yb = next(gen)
+        for i in range(len(Xb)):
+            if np.random.rand() < flip_prob:
+                Xb[i] = cv2.flip(Xb[i], 1)  # horizontal flip
+                yb[i] = -yb[i]             # reverse steering angle
+        yield Xb, yb
+
+batch_size = 32
+steps=len(X_train) // batch_size
+
 # triplet loss
 # MODEL
 nn = Sequential([
+        layers.Input(shape=(66,200,3)), # for input layer to avoid warning
         layers.BatchNormalization(),
         layers.Conv2D(24, (5,5), strides=(2,2), activation='relu', input_shape=(66,200,3)),
         layers.Conv2D(36, (5,5), strides=(2,2), activation='relu'),
@@ -69,7 +84,7 @@ nn = Sequential([
         layers.Conv2D(64, (3,3), activation='relu'),
         # layers.Dropout(0.5),
         layers.Flatten(),
-        # layers.Dense(1164, activation='relu'),
+        layers.Dense(1164, activation='relu'),
         layers.Dense(100, activation='relu'),
         layers.Dense(50, activation='relu'),
         layers.Dense(10, activation='relu'),
@@ -82,15 +97,25 @@ nn.compile(optimizer='adam',
            loss='MSE',
            metrics=['MAE'])
 
-nn.fit(aug.flow(X_train, y_train), validation_data=(X_test, y_test), epochs=6, batch_size=32)
+H = nn.fit(flipped_flow(X_train, y_train, batch_size=batch_size), validation_data=(X_test, y_test), epochs=10, steps_per_epoch=steps) 
 
 # EVALUATE
-plt.plot(H.history['loss'], label='loss')
-plt.plot(H.history['val_loss'], label='validation loss')
-plt.plot(H.history['MAE'], label='MAE')
-plt.plot(H.history['val_MAE'], label='validation MAE')
-plt.legend()
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
+ax1.plot(H.history['loss'], label='train loss')
+ax1.plot(H.history['val_loss'], label='validation loss')
+ax1.set_title('Model Loss (MSE)')
+ax1.set_xlabel('Epoch')
+ax1.set_ylabel('Loss')
+ax1.legend()
 
+ax2.plot(H.history['MAE'], label='train MAE')
+ax2.plot(H.history['val_MAE'], label='validation MAE')
+ax2.set_title('Model Mean Absolute Error (MAE)')
+ax2.set_xlabel('Epoch')
+ax2.set_ylabel('MAE')
+ax2.legend()
+
+plt.tight_layout()
 plt.show()
 
 #save model
