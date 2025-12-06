@@ -5,6 +5,7 @@ from sklearn.model_selection import train_test_split
 from keras import layers, Sequential
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import matplotlib.pyplot as plt
+import joblib
 
 # DATA
 data_list = []
@@ -43,13 +44,13 @@ for row in df.itertuples(index=False):  # index=False to exclude the DataFrame i
     img = cv2.GaussianBlur(img, (3, 3), 0)
 
     #Normalize values
-    image_f = img/255
+    # image_f = img/255
 
     # #Flatten
     # image_f = image_f.flatten()
 
     #store to lists
-    data_list.append(image_f)
+    data_list.append(img)
     value_list.append(steering)
 
     if i%200 == 0:
@@ -58,8 +59,6 @@ for row in df.itertuples(index=False):  # index=False to exclude the DataFrame i
         #     break
 
     i += 1
-
-cv2.destroyAllWindows()
 
 X = np.array(data_list)
 y = np.array(value_list)
@@ -79,23 +78,15 @@ aug = ImageDataGenerator(
 # triplet loss
 # MODEL
 nn = Sequential([
-        layers.Conv2D(24, (5,5), activation='relu', input_shape=(66,200,3)),
         layers.BatchNormalization(),
-        layers.MaxPool2D((2,2)),
-        layers.Conv2D(36, (5,5), activation='relu'),
-        layers.BatchNormalization(),
-        layers.MaxPool2D((2,2)),
-        layers.Conv2D(48, (5,5), activation='relu'),
-        layers.BatchNormalization(),
-        layers.MaxPool2D((2,2)),
+        layers.Conv2D(24, (5,5), strides=(2,2), activation='relu', input_shape=(66,200,3)),
+        layers.Conv2D(36, (5,5), strides=(2,2), activation='relu'),
+        layers.Conv2D(48, (5,5), strides=(2,2), activation='relu'),
         layers.Conv2D(64, (3,3), activation='relu'),
-        layers.BatchNormalization(),
-        layers.MaxPool2D((2,2)),
-        # layers.Conv2D(64, (3,3), activation='relu'),
-        # layers.BatchNormalization(),
-        # layers.MaxPool2D((2,2)),
+        layers.Conv2D(64, (3,3), activation='relu'),
+        # layers.Dropout(0.5),
         layers.Flatten(),
-        layers.Dense(1164, activation='relu'),
+        # layers.Dense(1164, activation='relu'),
         layers.Dense(100, activation='relu'),
         layers.Dense(50, activation='relu'),
         layers.Dense(10, activation='relu'),
@@ -108,7 +99,7 @@ nn.compile(optimizer='adam',
            loss='MSE',
            metrics=['MAE'])
 
-H = nn.fit(aug.flow(X_train, y_train), validation_data=(X_test, y_test), epochs=10, batch_size=32)
+H = nn.fit(aug.flow(X_train, y_train), validation_data=(X_test, y_test), epochs=6, batch_size=32)
 
 
 # EVALUATE
@@ -119,4 +110,8 @@ plt.plot(H.history['val_MAE'], label='validation MAE')
 plt.legend()
 
 plt.show()
+
+#save model
+joblib.dump(nn, "self_driving_car.z")
+
 
