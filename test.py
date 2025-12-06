@@ -5,8 +5,8 @@ import pandas as pd
 # # 1. Generate sample data (e.g., from a normal distribution)
 # data = np.random.randn(1000)
 
-path="data/"
-dataset = pd.read_csv(path+'driving_log.csv')
+path="dataset/"
+dataset = pd.read_csv(path+'driving_log.csv', header=None)
 steering_angle = dataset.iloc[:, 3]
 
 plt.hist(steering_angle, bins=30, color='skyblue', edgecolor='black')
