@@ -1,0 +1,57 @@
+name: cv-proj
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - numpy
+  - scipy
+  - pandas
+  - matplotlib
+  - scikit-learn
+  - scikit-image
+  - h5py
+  - click
+  - flask
+  - jinja2
+  - requests
+  - joblib
+  - networkx
+  - Pillow
+  - pip:
+    # Deep Learning
+    - tensorflow>=2.15.0
+    - tensorboard
+    - keras
+    
+    # Image processing
+    - imageio
+    - imgaug
+    - opencv-python
+    - PyWavelets
+    - tifffile
+    
+    # Web/Socket
+    - flask-socketio
+    - python-socketio
+    - python-engineio
+    - eventlet
+    - bidict
+    
+    # Utilities
+    - protobuf
+    - grpcio
+    - google-auth
+    - google-auth-oauthlib
+    - absl-py
+    - astunparse
+    - gast
+    - opt-einsum
+    - termcolor
+    - wrapt
+    - Markdown
+    - Werkzeug
+    
+    # Data handling
+    - shapely
