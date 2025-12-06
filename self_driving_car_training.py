@@ -7,11 +7,13 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import matplotlib.pyplot as plt
 import joblib
 
+#Utility class
+import utils
+
 # DATA
 data_list = []
 value_list = []
 
-img_size = (200,66)
 i=0
 path = "dataset/"
 df = pd.read_csv(path+'driving_log.csv', header=None)
@@ -24,27 +26,8 @@ for row in df.itertuples(index=False):  # index=False to exclude the DataFrame i
     img_fullpath = path+"IMG/"+img_filename
 
     image = cv2.imread(img_fullpath)
-    dimensions = image.shape
-    image_w = dimensions[1]
-
-    #crop image
-    x_start = 0
-    y_start = 60
-    width = image_w
-    height = 135 - 60
-    cropped_image = image[y_start : y_start + height, x_start : x_start + width]
-
-    #convert to YUV color
-    img_yuv = cv2.cvtColor(cropped_image, cv2.COLOR_BGR2YUV)
-
-    #resize image
-    img = cv2.resize(img_yuv, img_size)
-
-    #apply Gaussian blur
-    img = cv2.GaussianBlur(img, (3, 3), 0)
-
-    #Normalize values
-    # image_f = img/255
+    
+    img = utils.preprocess(image)
 
     # #Flatten
     # image_f = image_f.flatten()
@@ -99,8 +82,7 @@ nn.compile(optimizer='adam',
            loss='MSE',
            metrics=['MAE'])
 
-H = nn.fit(aug.flow(X_train, y_train), validation_data=(X_test, y_test), epochs=6, batch_size=32)
-
+nn.fit(aug.flow(X_train, y_train), validation_data=(X_test, y_test), epochs=6, batch_size=32)
 
 # EVALUATE
 plt.plot(H.history['loss'], label='loss')
@@ -112,6 +94,6 @@ plt.legend()
 plt.show()
 
 #save model
-joblib.dump(nn, "self_driving_car.z")
+nn.save("model.keras")
 
 
