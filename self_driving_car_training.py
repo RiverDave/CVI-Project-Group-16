@@ -3,6 +3,7 @@ import pandas as pd
 import cv2
 from sklearn.model_selection import train_test_split
 from tensorflow.keras import layers, Sequential
+# from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import matplotlib.pyplot as plt
 import joblib
@@ -44,13 +45,13 @@ for row in df.itertuples(index=False):  # index=False to exclude the DataFrame i
     img = cv2.GaussianBlur(img, (3, 3), 0)
 
     #Normalize values
-    # image_f = img/255
+    image_f = img/255
 
     # #Flatten
     # image_f = image_f.flatten()
 
     #store to lists
-    data_list.append(img)
+    data_list.append(image_f)
     value_list.append(steering)
 
     if i%200 == 0:
@@ -98,9 +99,9 @@ nn = Sequential([
         layers.Conv2D(48, (5,5), strides=(2,2), activation='relu'),
         layers.Conv2D(64, (3,3), activation='relu'),
         layers.Conv2D(64, (3,3), activation='relu'),
-        # layers.Dropout(0.5),
         layers.Flatten(),
-        # layers.Dense(1164, activation='relu'),
+        # layers.Dropout(0.5),
+        layers.Dense(1164, activation='relu'),
         layers.Dense(100, activation='relu'),
         layers.Dense(50, activation='relu'),
         layers.Dense(10, activation='relu'),
@@ -116,16 +117,26 @@ nn.compile(optimizer='adam',
 # H = nn.fit(aug.flow(X_train, y_train), validation_data=(X_test, y_test), epochs=6, batch_size=32)
 
 # use the wrapped augmentation function to handle image and steering flipping
-H = nn.fit(flipped_flow(X_train, y_train, batch_size=batch_size), validation_data=(X_test, y_test), epochs=6, steps_per_epoch=steps) 
+H = nn.fit(flipped_flow(X_train, y_train, batch_size=batch_size), validation_data=(X_test, y_test), epochs=10, steps_per_epoch=steps) 
 
 
 # EVALUATE
-plt.plot(H.history['loss'], label='loss')
-plt.plot(H.history['val_loss'], label='validation loss')
-plt.plot(H.history['MAE'], label='MAE')
-plt.plot(H.history['val_MAE'], label='validation MAE')
-plt.legend()
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
+ax1.plot(H.history['loss'], label='train loss')
+ax1.plot(H.history['val_loss'], label='validation loss')
+ax1.set_title('Model Loss (MSE)')
+ax1.set_xlabel('Epoch')
+ax1.set_ylabel('Loss')
+ax1.legend()
 
+ax2.plot(H.history['MAE'], label='train MAE')
+ax2.plot(H.history['val_MAE'], label='validation MAE')
+ax2.set_title('Model Mean Absolute Error (MAE)')
+ax2.set_xlabel('Epoch')
+ax2.set_ylabel('MAE')
+ax2.legend()
+
+plt.tight_layout()
 plt.show()
 
 #save model
