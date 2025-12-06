@@ -49,13 +49,13 @@ for row in df.itertuples(index=False):  # index=False to exclude the DataFrame i
     # image_f = image_f.flatten()
 
     #store to lists
-    data_list.append(img)
+    data_list.append(image_f)
     value_list.append(steering)
 
     if i%200 == 0:
         print(f'[INFO] {i} images read!')
-        if i > 1000:
-            break
+        # if i > 1000:
+        #     break
 
     i += 1
 
