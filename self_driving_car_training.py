@@ -5,7 +5,7 @@ from sklearn.model_selection import train_test_split
 from keras import layers, Sequential
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import matplotlib.pyplot as plt
-import joblib
+# import joblib
 
 #Utility class
 import utils
@@ -97,7 +97,7 @@ nn.compile(optimizer='adam',
            loss='MSE',
            metrics=['MAE'])
 
-H = nn.fit(flipped_flow(X_train, y_train, batch_size=batch_size), validation_data=(X_test, y_test), epochs=10, steps_per_epoch=steps) 
+H = nn.fit(flipped_flow(X_train, y_train, batch_size=batch_size), validation_data=(X_test, y_test), epochs=30, steps_per_epoch=steps) 
 
 # EVALUATE
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
