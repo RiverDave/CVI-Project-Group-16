@@ -94,10 +94,11 @@ nn = Sequential([
 
 
 nn.compile(optimizer='adam',
-           loss='MSE',
-           metrics=['MAE'])
+           loss='mse',
+           metrics=['mae'])
 
-H = nn.fit(flipped_flow(X_train, y_train, batch_size=batch_size), validation_data=(X_test, y_test), epochs=30, steps_per_epoch=steps) 
+# H = nn.fit(flipped_flow(X_train, y_train, batch_size=batch_size), validation_data=(X_test, y_test), epochs=30, steps_per_epoch=steps) 
+H = nn.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=50) 
 
 # EVALUATE
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
@@ -108,8 +109,8 @@ ax1.set_xlabel('Epoch')
 ax1.set_ylabel('Loss')
 ax1.legend()
 
-ax2.plot(H.history['MAE'], label='train MAE')
-ax2.plot(H.history['val_MAE'], label='validation MAE')
+ax2.plot(H.history['mae'], label='train MAE')
+ax2.plot(H.history['val_mae'], label='validation MAE')
 ax2.set_title('Model Mean Absolute Error (MAE)')
 ax2.set_xlabel('Epoch')
 ax2.set_ylabel('MAE')
