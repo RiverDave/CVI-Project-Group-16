@@ -46,16 +46,24 @@ for row in df.itertuples(index=False):  # index=False to exclude the DataFrame i
 X = np.array(data_list)
 y = np.array(value_list)
 
+# Horizonal flip augmentation
+X_flipped = np.array([cv2.flip(img, 1) for img in X])
+y_flipped = -y
+X = np.concatenate((X, X_flipped)) 
+y = np.concatenate((y, y_flipped))
+
+
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
 #Data Augmentation
 aug = ImageDataGenerator(
-    rotation_range=20,
-    width_shift_range=0.2,
-    height_shift_range=0.2,
-    shear_range=0.2,
-    zoom_range=0.2,
-    brightness_range=[0.5, 1.5],
+    # rotation_range=5, #20
+    width_shift_range=0.05, #0.2
+    # height_shift_range=0., #0.2
+    # shear_range=0.2, #0.2
+    zoom_range=0.1, #0.2
+    brightness_range=[0.8, 1.2], #(0.2,1.2)
+    fill_mode="nearest"
 )
 
 def flipped_flow(X, y, batch_size, flip_prob=0.5):
@@ -98,7 +106,7 @@ nn.compile(optimizer='adam',
            metrics=['mae'])
 
 # H = nn.fit(flipped_flow(X_train, y_train, batch_size=batch_size), validation_data=(X_test, y_test), epochs=30, steps_per_epoch=steps) 
-H = nn.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=50) 
+H = nn.fit(X_train, y_train, validation_data=(X_test, y_test), epochs=15) 
 
 # EVALUATE
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
