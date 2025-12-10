@@ -14,34 +14,47 @@ import utils
 data_list = []
 value_list = []
 
+# Steering correction for left/right cameras
+STEERING_CORRECTION = 0.2
+
 i=0
 path = "dataset/"
 df = pd.read_csv(path+'driving_log.csv', header=None)
 for row in df.itertuples(index=False):  # index=False to exclude the DataFrame index
-    img_absolute_path = row[0]
+    # Column 0: center, Column 1: left, Column 2: right
+    center_path = row[0]
+    left_path = row[1]
+    right_path = row[2]
     steering = row[3]
 
-    #get image filename
-    img_filename = img_absolute_path.split('\\')[-1]
-    img_fullpath = path+"IMG/"+img_filename
+    # Process all 3 cameras
+    cameras = [
+        (center_path, steering),                      # Center: original steering
+        (left_path, steering + STEERING_CORRECTION),  # Left: steer right to correct
+        (right_path, steering - STEERING_CORRECTION)  # Right: steer left to correct
+    ]
 
-    image = cv2.imread(img_fullpath)
-    
-    img = utils.preprocess(image)
+    for img_path, adjusted_steering in cameras:
+        # Get image filename (handle both Windows and Unix paths)
+        img_filename = img_path.strip().replace('\\', '/').split('/')[-1]
+        img_fullpath = path + "IMG/" + img_filename
 
-    # #Flatten
-    # image_f = image_f.flatten()
+        image = cv2.imread(img_fullpath)
+        if image is None:
+            continue  # Skip if image not found
+        
+        img = utils.preprocess(image)
 
-    #store to lists
-    data_list.append(img)
-    value_list.append(steering)
+        # Store to lists
+        data_list.append(img)
+        value_list.append(adjusted_steering)
 
-    if i%200 == 0:
-        print(f'[INFO] {i} images read!')
-        # if i > 1000:
-        #     break
+    if i % 200 == 0:
+        print(f'[INFO] {i} rows processed ({len(data_list)} images)!')
 
     i += 1
+
+print(f'[INFO] Total images loaded: {len(data_list)}')
 
 X = np.array(data_list)
 y = np.array(value_list)
@@ -82,10 +95,11 @@ nn = Sequential([
         layers.Conv2D(48, (5,5), strides=(2,2), activation='relu'),
         layers.Conv2D(64, (3,3), activation='relu'),
         layers.Conv2D(64, (3,3), activation='relu'),
-        # layers.Dropout(0.5),
+        layers.Dropout(0.3),
         layers.Flatten(),
         layers.Dense(1164, activation='relu'),
         layers.Dense(100, activation='relu'),
+        layers.Dropout(0.2),
         layers.Dense(50, activation='relu'),
         layers.Dense(10, activation='relu'),
         layers.Dense(1)
