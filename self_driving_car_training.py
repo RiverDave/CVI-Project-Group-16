@@ -22,6 +22,9 @@ tf.keras.mixed_precision.set_global_policy(policy)
 data_list = []
 value_list = []
 
+# Steering correction for left/right cameras
+STEERING_CORRECTION = 0.2
+
 i=0
 path = "dataset/"
 df = pd.read_csv(path+'driving_log.csv', header=None)
@@ -34,7 +37,9 @@ for row in df.itertuples(index=False):  # index=False to exclude the DataFrame i
 
     # Process all 3 cameras
     cameras = [
-        (center_path, steering),
+        (center_path, steering),                      # Center: original steering
+        (left_path, steering + STEERING_CORRECTION),  # Left: steer right to correct
+        (right_path, steering - STEERING_CORRECTION)  # Right: steer left to correct
     ]
 
     for img_path, adjusted_steering in cameras:
@@ -65,11 +70,11 @@ y = np.array(value_list)
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
 # Create tf.data pipeline (GPU-optimized)
-batch_size = 64  # Larger batch size for GPU
+batch_size = 64  # Larger batch for H100
 
 def augment_fn(image, steering):
     """GPU-compatible augmentation with shadow and translation."""
-    
+    # Random flip (important for balancing left/right turns)
     if tf.random.uniform(()) < 0.5:
         image = tf.image.flip_left_right(image)
         steering = -steering
@@ -153,7 +158,15 @@ ax2.legend()
 plt.tight_layout()
 plt.show()
 
-#save model
-nn.save("model.keras")
+# Convert model to float32 for inference on CPU/different GPU
+# This is important because mixed_float16 training may not work well on laptops/edge
+tf.keras.mixed_precision.set_global_policy('float32')
+
+# Clone the model with float32 weights for portable inference
+inference_model = tf.keras.models.clone_model(nn)
+inference_model.set_weights(nn.get_weights())
+
+# save model (float32 - works on any machine)
+inference_model.save("model.keras")
 
 
