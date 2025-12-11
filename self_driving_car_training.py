@@ -5,17 +5,22 @@ from sklearn.model_selection import train_test_split
 from keras import layers, Sequential
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import matplotlib.pyplot as plt
-# import joblib
+import tensorflow as tf
 
 #Utility class
 import utils
 
+"""
+Enable mixed precision for performance, essentially:
+- Basically, All layers will use f32 to store data, BUT:
+    - The computations will be done in float16 where possible, this is given the nature of GPUs (faster with float16)
+"""
+policy = tf.keras.mixed_precision.Policy('mixed_float16')
+tf.keras.mixed_precision.set_global_policy(policy)
+
 # DATA
 data_list = []
 value_list = []
-
-# Steering correction for left/right cameras
-STEERING_CORRECTION = 0.2
 
 i=0
 path = "dataset/"
@@ -29,9 +34,7 @@ for row in df.itertuples(index=False):  # index=False to exclude the DataFrame i
 
     # Process all 3 cameras
     cameras = [
-        (center_path, steering),                      # Center: original steering
-        (left_path, steering + STEERING_CORRECTION),  # Left: steer right to correct
-        (right_path, steering - STEERING_CORRECTION)  # Right: steer left to correct
+        (center_path, steering),
     ]
 
     for img_path, adjusted_steering in cameras:
@@ -61,57 +64,75 @@ y = np.array(value_list)
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
-#Data Augmentation
-aug = ImageDataGenerator(
-    rotation_range=20,
-    width_shift_range=0.2,
-    height_shift_range=0.2,
-    shear_range=0.2,
-    zoom_range=0.2,
-    brightness_range=[0.5, 1.5],
-)
+# Create tf.data pipeline (GPU-optimized)
+batch_size = 64  # Larger batch size for GPU
 
-def flipped_flow(X, y, batch_size, flip_prob=0.5):
-    """Yield augmented batches; optionally flip image and negate steering."""
-    gen = aug.flow(X, y, batch_size=batch_size, shuffle=True)
-    while True:
-        Xb, yb = next(gen)
-        for i in range(len(Xb)):
-            if np.random.rand() < flip_prob:
-                Xb[i] = cv2.flip(Xb[i], 1)  # horizontal flip
-                yb[i] = -yb[i]             # reverse steering angle
-        yield Xb, yb
+def augment_fn(image, steering):
+    """GPU-compatible augmentation with shadow and translation."""
+    
+    if tf.random.uniform(()) < 0.5:
+        image = tf.image.flip_left_right(image)
+        steering = -steering
+    
+    image = tf.image.random_brightness(image, 0.3)
+    
+    image = tf.image.random_contrast(image, 0.8, 1.2)
+    
+    image = tf.image.random_saturation(image, 0.8, 1.2)
+    
+    image = tf.clip_by_value(image, 0.0, 1.0)
+    
+    return image, steering
 
-batch_size = 32
-steps=len(X_train) // batch_size
+train_dataset = tf.data.Dataset.from_tensor_slices((X_train, y_train)) \
+    .shuffle(len(X_train)) \
+    .map(lambda x, y: (tf.cast(x, tf.float32), y), num_parallel_calls=tf.data.AUTOTUNE) \
+    .map(augment_fn, num_parallel_calls=tf.data.AUTOTUNE) \
+    .batch(batch_size) \
+    .prefetch(tf.data.AUTOTUNE)
 
-# triplet loss
-# MODEL
+val_dataset = tf.data.Dataset.from_tensor_slices((X_test, y_test)) \
+    .map(lambda x, y: (tf.cast(x, tf.float32), y), num_parallel_calls=tf.data.AUTOTUNE) \
+    .batch(batch_size) \
+    .prefetch(tf.data.AUTOTUNE)
+
+steps = len(X_train) // batch_size
+
+# The following Architecture is based on the NVIDIA's paper: End to End Learning for Self-Driving Cars
 nn = Sequential([
-        layers.Input(shape=(66,200,3)), # for input layer to avoid warning
+        layers.Input(shape=(66,200,3)),
         layers.BatchNormalization(),
-        layers.Conv2D(24, (5,5), strides=(2,2), activation='relu', input_shape=(66,200,3)),
+        layers.Conv2D(24, (5,5), strides=(2,2), activation='relu'),
         layers.Conv2D(36, (5,5), strides=(2,2), activation='relu'),
         layers.Conv2D(48, (5,5), strides=(2,2), activation='relu'),
         layers.Conv2D(64, (3,3), activation='relu'),
         layers.Conv2D(64, (3,3), activation='relu'),
-        layers.Dropout(0.3),
+        layers.Dropout(0.5),
         layers.Flatten(),
         layers.Dense(1164, activation='relu'),
+        layers.Dropout(0.3),
         layers.Dense(100, activation='relu'),
         layers.Dropout(0.2),
         layers.Dense(50, activation='relu'),
         layers.Dense(10, activation='relu'),
-        layers.Dense(1)
+        layers.Dense(1, dtype='float32')
 ])
 
 
-
-nn.compile(optimizer='adam',
+nn.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),  # Lower LR for stability
            loss='MSE',
            metrics=['MAE'])
 
-H = nn.fit(flipped_flow(X_train, y_train, batch_size=batch_size), validation_data=(X_test, y_test), epochs=30, steps_per_epoch=steps) 
+# Add early stopping and learning rate reduction
+early_stop = tf.keras.callbacks.EarlyStopping(
+    monitor='val_loss', patience=5, restore_best_weights=True
+)
+reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(
+    monitor='val_loss', factor=0.5, patience=3, min_lr=1e-6
+)
+
+H = nn.fit(train_dataset, validation_data=val_dataset, epochs=50, 
+           steps_per_epoch=steps, callbacks=[early_stop, reduce_lr]) 
 
 # EVALUATE
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))

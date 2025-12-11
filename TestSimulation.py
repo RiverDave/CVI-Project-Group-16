@@ -56,10 +56,10 @@ def telemetry(sid, data):
         # The current speed of the car
         speed = float(data["speed"])
         # The current image from the center camera of the car
-        image = Image.open(BytesIO(base64.b64decode(data["image"])))
+        image = Image.open(BytesIO(base64.b64decode(data["image"]))) # THIS IS RGB!!!!
         try:
             image = np.asarray(image)       # from PIL image to numpy array (RGB format)
-            image = utils.preprocess(image, is_bgr=False) # RGB from simulator, not BGR!
+            image = utils.preprocess(image, is_bgr=False) # preprocess and convert to YUV format
             image = np.array([image])       # the model expects 4D array
 
             # predict the steering angle for the image
