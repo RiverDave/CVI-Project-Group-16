@@ -1,4 +1,4 @@
-name: cv-proj
+name: cv-proj-2
 channels:
   - conda-forge
   - defaults
